@@ -159,7 +159,7 @@ const fileToDataUrl = (file: File): Promise<OriginalImage> => {
 const applyTextOverlay = (
     base64Image: string, 
     text: string, 
-    options: { fontFamily: string; fontSize: number; textColor: string }
+    options: { fontFamily: string; fontSize: number; textColor: string; textPosition: string; }
 ): Promise<string> => {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -178,8 +178,6 @@ const applyTextOverlay = (
             // Style the text
             ctx.font = `${options.fontSize}px ${options.fontFamily}`;
             ctx.fillStyle = options.textColor;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
             
             // Add a simple shadow for better visibility
             ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
@@ -187,8 +185,69 @@ const applyTextOverlay = (
             ctx.shadowOffsetX = 2;
             ctx.shadowOffsetY = 2;
 
-            // Draw the text in the center
-            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            let x, y;
+            const padding = Math.min(canvas.width, canvas.height) * 0.05;
+
+            switch (options.textPosition) {
+                case 'top-left':
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    x = padding;
+                    y = padding;
+                    break;
+                case 'top-center':
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    x = canvas.width / 2;
+                    y = padding;
+                    break;
+                case 'top-right':
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'top';
+                    x = canvas.width - padding;
+                    y = padding;
+                    break;
+                case 'middle-left':
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    x = padding;
+                    y = canvas.height / 2;
+                    break;
+                case 'middle-right':
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    x = canvas.width - padding;
+                    y = canvas.height / 2;
+                    break;
+                case 'bottom-left':
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'bottom';
+                    x = padding;
+                    y = canvas.height - padding;
+                    break;
+                case 'bottom-center':
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    x = canvas.width / 2;
+                    y = canvas.height - padding;
+                    break;
+                case 'bottom-right':
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'bottom';
+                    x = canvas.width - padding;
+                    y = canvas.height - padding;
+                    break;
+                case 'center':
+                default:
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    x = canvas.width / 2;
+                    y = canvas.height / 2;
+                    break;
+            }
+
+            // Draw the text in the calculated position
+            ctx.fillText(text, x, y);
 
             resolve(canvas.toDataURL('image/png'));
         };
@@ -215,6 +274,7 @@ const App: React.FC = () => {
   const [fontFamily, setFontFamily] = useState('Arial');
   const [fontSize, setFontSize] = useState(48);
   const [textColor, setTextColor] = useState('#ffffff');
+  const [textPosition, setTextPosition] = useState('center');
   const [isTextToolsVisible, setIsTextToolsVisible] = useState(false);
 
   // Download format state
@@ -224,6 +284,11 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
 
+  const textPositions = [
+    'top-left', 'top-center', 'top-right', 
+    'middle-left', 'center', 'middle-right', 
+    'bottom-left', 'bottom-center', 'bottom-right'
+  ];
 
   const EXAMPLE_PROMPTS = [
     "Add a dog in the foreground",
@@ -333,7 +398,7 @@ const App: React.FC = () => {
 
         if (textOverlay.trim()) {
             try {
-                const finalImage = await applyTextOverlay(imageBeforeText, textOverlay, { fontFamily, fontSize, textColor });
+                const finalImage = await applyTextOverlay(imageBeforeText, textOverlay, { fontFamily, fontSize, textColor, textPosition });
                 setEditedImage(finalImage);
             } catch (err) {
                 setError("Failed to apply text overlay.");
@@ -345,7 +410,7 @@ const App: React.FC = () => {
     };
 
     applyText();
-  }, [textOverlay, fontFamily, fontSize, textColor, imageBeforeText]);
+  }, [textOverlay, fontFamily, fontSize, textColor, textPosition, imageBeforeText]);
   
   const handleDownload = () => {
     if (!editedImage) return;
@@ -433,6 +498,7 @@ const App: React.FC = () => {
     setIsTextToolsVisible(false);
     setOutputFormat('png');
     setAspectRatio('original');
+    setTextPosition('center');
   }
 
   const reset = () => {
@@ -629,47 +695,71 @@ const App: React.FC = () => {
             </div>
             
             {isTextToolsVisible && imageBeforeText && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-gray-800/50 p-3 rounded-lg mb-4 border border-gray-700">
+                <div className="flex flex-col gap-4 bg-gray-800/50 p-3 rounded-lg mb-4 border border-gray-700">
                     <input
                         type="text"
                         placeholder="Your text here..."
                         value={textOverlay}
                         onChange={(e) => setTextOverlay(e.target.value)}
-                        className="sm:col-span-2 md:col-span-1 w-full bg-gray-700 text-gray-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full bg-gray-700 text-gray-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
-                     <select 
-                        value={fontFamily} 
-                        onChange={e => setFontFamily(e.target.value)}
-                        className="w-full bg-gray-700 text-gray-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
-                    >
-                        <option>Arial</option>
-                        <option>Verdana</option>
-                        <option>Georgia</option>
-                        <option>Times New Roman</option>
-                        <option>Courier New</option>
-                        <option>Impact</option>
-                    </select>
-                    <div className="flex items-center gap-2 bg-gray-700 rounded-md px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-500">
-                        <label htmlFor="font-size" className="text-sm text-gray-400">Size:</label>
-                        <input
-                            id="font-size"
-                            type="number"
-                            value={fontSize}
-                            onChange={e => setFontSize(parseInt(e.target.value, 10) || 1)}
-                            className="w-full bg-transparent text-gray-100 focus:outline-none"
-                        />
-                    </div>
-                     <div className="flex items-center gap-2 bg-gray-700 rounded-md px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-500">
-                        <label htmlFor="font-color" className="text-sm text-gray-400">Color:</label>
-                        <input
-                            id="font-color"
-                            type="color"
-                            value={textColor}
-                            onChange={e => setTextColor(e.target.value)}
-                            className="w-full h-6 bg-transparent border-none cursor-pointer"
-                            title="Select text color"
-                        />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-end">
+                        <div>
+                            <label className="text-sm text-gray-400 block mb-1">Font</label>
+                             <select 
+                                value={fontFamily} 
+                                onChange={e => setFontFamily(e.target.value)}
+                                className="w-full bg-gray-700 text-gray-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                                style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
+                            >
+                                <option>Arial</option>
+                                <option>Verdana</option>
+                                <option>Georgia</option>
+                                <option>Times New Roman</option>
+                                <option>Courier New</option>
+                                <option>Impact</option>
+                            </select>
+                        </div>
+                        <div>
+                           <label htmlFor="font-size" className="text-sm text-gray-400 block mb-1">Size</label>
+                            <div className="flex items-center gap-2 bg-gray-700 rounded-md px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-500">
+                                <input
+                                    id="font-size"
+                                    type="number"
+                                    value={fontSize}
+                                    onChange={e => setFontSize(parseInt(e.target.value, 10) || 1)}
+                                    className="w-full bg-transparent text-gray-100 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label htmlFor="font-color" className="text-sm text-gray-400 block mb-1">Color</label>
+                            <div className="flex items-center bg-gray-700 rounded-md p-1 h-[42px] focus-within:ring-2 focus-within:ring-indigo-500">
+                                <input
+                                    id="font-color"
+                                    type="color"
+                                    value={textColor}
+                                    onChange={e => setTextColor(e.target.value)}
+                                    className="w-full h-full bg-transparent border-none cursor-pointer"
+                                    title="Select text color"
+                                />
+                            </div>
+                        </div>
+                         <div className="col-span-2 sm:col-span-1">
+                             <label className="text-sm text-gray-400 text-center block mb-1">Position</label>
+                             <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-900/50 rounded-md max-w-[100px] mx-auto">
+                                {textPositions.map(pos => (
+                                    <button
+                                        key={pos}
+                                        onClick={() => setTextPosition(pos)}
+                                        className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${textPosition === pos ? 'bg-indigo-600 ring-2 ring-indigo-400' : 'bg-gray-700 hover:bg-gray-600'}`}
+                                        title={`Position: ${pos.replace('-', ' ')}`}
+                                    >
+                                        <div className={`w-2 h-2 rounded-full ${textPosition === pos ? 'bg-white' : 'bg-gray-400'}`}></div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
