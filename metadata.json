@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Image Editor",
+  "description": "Edit your images with simple text prompts using the power of Gemini. Change backgrounds, add objects, apply filters, and let your creativity run wild.",
+  "requestFramePermissions": []
+}
